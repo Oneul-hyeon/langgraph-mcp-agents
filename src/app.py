@@ -20,6 +20,7 @@ if "event_loop" not in st.session_state:
 from langgraph.prebuilt import create_react_agent
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -30,10 +31,14 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 
 # 환경 변수 로드 (.env 파일에서 API 키 등의 설정을 가져옴)
-load_dotenv(override=True)
+load_dotenv(dotenv_path="/mnt/hdd/hyeontae/langgraph-mcp-agents/.env",
+            override=True)
 
 # config.json 파일 경로 설정
-CONFIG_FILE_PATH = "config.json"
+NOW_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.join(NOW_DIR, os.pardir)
+CFG_DIR = os.path.join(ROOT_DIR, "cfg")
+CONFIG_FILE_PATH = os.path.join(CFG_DIR, "config.json")
 
 # JSON 설정 파일 로드 함수
 def load_config_from_json():
@@ -123,14 +128,6 @@ if use_login and not st.session_state.authenticated:
     # 로그인 화면에서는 메인 앱을 표시하지 않음
     st.stop()
 
-# 사이드바 최상단에 저자 정보 추가 (다른 사이드바 요소보다 먼저 배치)
-st.sidebar.markdown("### ✍️ Made by [테디노트](https://youtube.com/c/teddynote) 🚀")
-st.sidebar.markdown(
-    "### 💻 [Project Page](https://github.com/teddynote-lab/langgraph-mcp-agents)"
-)
-
-st.sidebar.divider()  # 구분선 추가
-
 # 기존 페이지 타이틀 및 설명
 st.title("💬 MCP 도구 활용 에이전트")
 st.markdown("✨ MCP 도구를 활용한 ReAct 에이전트에게 질문해보세요.")
@@ -189,6 +186,8 @@ OUTPUT_TOKEN_INFO = {
     "claude-3-7-sonnet-latest": {"max_tokens": 64000},
     "gpt-4o": {"max_tokens": 16000},
     "gpt-4o-mini": {"max_tokens": 16000},
+    "gemini-2.0-flash": {"max_output_tokens":8192},
+    "gemini-2.5-flash": {"max_output_tokens":8192}
 }
 
 # 세션 상태 초기화
@@ -198,7 +197,7 @@ if "session_initialized" not in st.session_state:
     st.session_state.history = []  # 대화 기록 저장 리스트
     st.session_state.mcp_client = None  # MCP 클라이언트 객체 저장 공간
     st.session_state.timeout_seconds = 120  # 응답 생성 제한 시간(초), 기본값 120초
-    st.session_state.selected_model = "claude-3-7-sonnet-latest"  # 기본 모델 선택
+    st.session_state.selected_model = "gemini-2.5-flash"  # 기본 모델 선택
     st.session_state.recursion_limit = 100  # 재귀 호출 제한, 기본값 100
 
 if "thread_id" not in st.session_state:
@@ -238,11 +237,11 @@ def print_message():
         message = st.session_state.history[i]
 
         if message["role"] == "user":
-            st.chat_message("user", avatar="🧑‍💻").markdown(message["content"])
+            st.chat_message("user").markdown(message["content"])
             i += 1
         elif message["role"] == "assistant":
             # 어시스턴트 메시지 컨테이너 생성
-            with st.chat_message("assistant", avatar="🤖"):
+            with st.chat_message("assistant"):
                 # 어시스턴트 메시지 내용 표시
                 st.markdown(message["content"])
 
@@ -437,8 +436,8 @@ async def initialize_session(mcp_config=None):
             # config.json 파일에서 설정 로드
             mcp_config = load_config_from_json()
         client = MultiServerMCPClient(mcp_config)
-        await client.__aenter__()
-        tools = client.get_tools()
+        # await client.__aenter__()
+        tools = await client.get_tools()
         st.session_state.tool_count = len(tools)
         st.session_state.mcp_client = client
 
@@ -454,6 +453,15 @@ async def initialize_session(mcp_config=None):
                 model=selected_model,
                 temperature=0.1,
                 max_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_tokens"],
+            )
+        elif selected_model in [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash"
+        ] :
+            model = ChatGoogleGenerativeAI(
+                model=selected_model,
+                temperature=0.1,
+                max_output_tokens=OUTPUT_TOKEN_INFO[selected_model]["max_output_tokens"]
             )
         else:  # OpenAI 모델 사용
             model = ChatOpenAI(
@@ -496,13 +504,18 @@ with st.sidebar:
     if has_openai_key:
         available_models.extend(["gpt-4o", "gpt-4o-mini"])
 
+    # Gemini API 키 확인
+    has_gemini_key = os.environ.get("GOOGLE_API_KEY") is not None
+    if has_gemini_key :
+        available_models.extend(["gemini-2.0-flash", "gemini-2.5-flash"])
+
     # 사용 가능한 모델이 없는 경우 메시지 표시
     if not available_models:
         st.warning(
-            "⚠️ API 키가 설정되지 않았습니다. .env 파일에 ANTHROPIC_API_KEY 또는 OPENAI_API_KEY를 추가해주세요."
+            "⚠️ API 키가 설정되지 않았습니다. .env 파일에 ANTHROPIC_API_KEY 또는 GOOGLE_API_KEY 또는 OPENAI_API_KEY를 추가해주세요."
         )
         # 기본값으로 Claude 모델 추가 (키가 없어도 UI를 보여주기 위함)
-        available_models = ["claude-3-7-sonnet-latest"]
+        available_models = ["gemini-2.5-flash"]
 
     # 모델 선택 드롭다운
     previous_model = st.session_state.selected_model
@@ -569,12 +582,6 @@ with st.sidebar:
 
         # 개별 도구 추가를 위한 UI
         st.subheader("도구 추가")
-        st.markdown(
-            """
-            [어떻게 설정 하나요?](https://teddylee777.notion.site/MCP-1d324f35d12980c8b018e12afdf545a1?pvs=4)
-
-            ⚠️ **중요**: JSON을 반드시 중괄호(`{}`)로 감싸야 합니다."""
-        )
 
         # 보다 명확한 예시 제공
         example_json = {
@@ -816,8 +823,8 @@ print_message()
 user_query = st.chat_input("💬 질문을 입력하세요")
 if user_query:
     if st.session_state.session_initialized:
-        st.chat_message("user", avatar="🧑‍💻").markdown(user_query)
-        with st.chat_message("assistant", avatar="🤖"):
+        st.chat_message("user").markdown(user_query)
+        with st.chat_message("assistant"):
             tool_placeholder = st.empty()
             text_placeholder = st.empty()
             resp, final_text, final_tool = (

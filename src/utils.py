@@ -52,7 +52,6 @@ async def astream_graph(
                 "content": chunk_msg,
                 "metadata": metadata,
             }
-
             # node_names가 비어있거나 현재 노드가 node_names에 있는 경우에만 처리
             if not node_names or curr_node in node_names:
                 # 콜백 함수가 있는 경우 실행
@@ -72,15 +71,16 @@ async def astream_graph(
                     if hasattr(chunk_msg, "content"):
                         # 리스트 형태의 content (Anthropic/Claude 스타일)
                         if isinstance(chunk_msg.content, list):
-                            for item in chunk_msg.content:
-                                if isinstance(item, dict) and "text" in item:
-                                    print(item["text"], end="", flush=True)
+                            pass
+                            # for item in chunk_msg.content:
+                                # if isinstance(item, dict) and "text" in item:
+                                    # print(item["text"], end="", flush=True)
                         # 문자열 형태의 content
                         elif isinstance(chunk_msg.content, str):
                             print(chunk_msg.content, end="", flush=True)
                     # 그 외 형태의 chunk_msg 처리
-                    else:
-                        print(chunk_msg, end="", flush=True)
+                    # else:
+                        # print(chunk_msg, end="", flush=True)
 
                 prev_node = curr_node
 

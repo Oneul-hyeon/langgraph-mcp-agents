@@ -1,0 +1,23 @@
+{
+  "document-retriever": {
+    "command": "/mnt/hdd/Anaconda3/mcp/bin/python",
+    "args": [
+      "src/mcp_server_rag.py"
+    ],
+    "transport": "stdio"
+  },
+  "desktop-commander": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@smithery/cli@latest",
+      "run",
+      "@wonderwhy-er/desktop-commander",
+      "--key",
+      "c8974619-e333-499e-ae13-3c6e7e5c0c31",
+      "--profile",
+      "urban-coral-wvbFy0"
+    ],
+    "transport": "stdio"
+  }
+}

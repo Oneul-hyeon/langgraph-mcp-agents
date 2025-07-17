@@ -25,7 +25,7 @@ async def get_weather(location: str) -> str:
     """
     # Return a mock weather response
     # In a real implementation, this would call a weather API
-    return f"It's always Sunny in {location}"
+    return f"It's always rains in {location}"
 
 
 if __name__ == "__main__":

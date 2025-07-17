@@ -1,14 +1,19 @@
+import os
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
-from langchain_community.vectorstores import FAISS
+from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
 from typing import Any
+from langchain_ollama import OllamaEmbeddings
 
 # Load environment variables from .env file (contains API keys)
 load_dotenv(override=True)
 
+NOW_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.join(NOW_DIR, os.pardir)
+DATA_DIR = os.path.join(ROOT_DIR, "data")
 
 def create_retriever() -> Any:
     """
@@ -26,7 +31,7 @@ def create_retriever() -> Any:
     """
     # Step 1: Load Documents
     # PyMuPDFLoader is used to extract text from PDF files
-    loader = PyMuPDFLoader("data/sample.pdf")
+    loader = PyMuPDFLoader(os.path.join(DATA_DIR, "SPRI_AI_Brief_2023년12월호_F.pdf"))
     docs = loader.load()
 
     # Step 2: Split Documents
@@ -35,13 +40,13 @@ def create_retriever() -> Any:
     split_documents = text_splitter.split_documents(docs)
 
     # Step 3: Create Embeddings
-    # OpenAI's text-embedding-3-small model is used to convert text chunks into vector embeddings
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
+    embeddings = OllamaEmbeddings(model="bge-m3:latest",
+                                  base_url="work.soundmind.life:11434")
+    
     # Step 4: Create Vector Database
     # FAISS is an efficient similarity search library that stores vector embeddings
     # and allows for fast retrieval of similar vectors
-    vectorstore = FAISS.from_documents(documents=split_documents, embedding=embeddings)
+    vectorstore = Chroma.from_documents(documents=split_documents, embedding=embeddings)
 
     # Step 5: Create Retriever
     # The retriever provides an interface to search the vector database
@@ -53,14 +58,15 @@ def create_retriever() -> Any:
 # Initialize FastMCP server with configuration
 mcp = FastMCP(
     "Retriever",
-    instructions="A Retriever that can retrieve information from the database.",
+    # instructions="You are an assistant who searches documents and helps answer questions.",
+    instructions="You are an assistant who searches documents and helps answer questions.",
     host="0.0.0.0",
     port=8005,
 )
 
 
 @mcp.tool()
-async def retrieve(query: str) -> str:
+async def retrieve(query:str) -> str:
     """
     Retrieves information from the document database based on the query.
 
@@ -73,10 +79,11 @@ async def retrieve(query: str) -> str:
     Returns:
         str: Concatenated text content from all retrieved documents
     """
+
     # Create a new retriever instance for each query
     # Note: In production, consider caching the retriever for better performance
     retriever = create_retriever()
-
+    
     # Use the invoke() method to get relevant documents based on the query
     retrieved_docs = retriever.invoke(query)
 
