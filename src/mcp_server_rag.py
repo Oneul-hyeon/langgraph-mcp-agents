@@ -40,8 +40,7 @@ def create_retriever() -> Any:
     split_documents = text_splitter.split_documents(docs)
 
     # Step 3: Create Embeddings
-    embeddings = OllamaEmbeddings(model="bge-m3:latest",
-                                  base_url="work.soundmind.life:11434")
+    embeddings = OllamaEmbeddings(model="bge-m3:latest")
     
     # Step 4: Create Vector Database
     # FAISS is an efficient similarity search library that stores vector embeddings
